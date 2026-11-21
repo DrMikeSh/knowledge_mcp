@@ -18,6 +18,7 @@
 - [Offline npm dependency checkpoint](offline-npm-install.md) — Reviewed manifest and lockfile, clean offline install, and confirmed installed pins.
 - [MCP protocol baseline](protocol-baseline.md) — Verified in-memory core negotiation and the installed SDK and Apps pins.
 - [T1.1a preflight test scripts](preflight-test-scripts.md) — The checked root npm commands and their exact local coverage.
+- [T1.1b offline TypeScript toolchain](offline-typescript-toolchain.md) — Exact dev pins, offline lock generation, clean install, and installed-version verification.
 - [T6.5a–c offline MCP tool fixtures](offline-mcp-tool-fixtures.md) — Fixture discovery, successful read call, and malformed-call error coverage.
 - [T6.5e–f offline MCP resource fixture](offline-mcp-resource-fixture.md) — Resource URI, Apps MIME profile, and linked tool metadata coverage.
 
