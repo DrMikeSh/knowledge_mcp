@@ -15,5 +15,6 @@
 - [T0.4 offline blockers](offline-blockers.md) — Original preflight blockers and connected-host gates.
 - [Offline preflight follow-up](offline-preflight-follow-up.md) — Earlier cache evidence, one T1.4 acceptance case, and provisioning gates.
 - [B7.1 SQLite FTS5 smoke test](sqlite-fts5-smoke.md) — Verified in-memory Node SQLite check; migrations remain untested.
+- [Offline npm dependency checkpoint](offline-npm-install.md) — Reviewed manifest and lockfile, clean offline install, and confirmed installed pins.
 
-Offline npm install, Docker build, and MCP harness readiness are not yet verified. ChatGPT and Claude remain **EXTERNAL VERIFICATION PENDING**.
+Docker build and MCP harness readiness are not yet verified. ChatGPT and Claude remain **EXTERNAL VERIFICATION PENDING**.

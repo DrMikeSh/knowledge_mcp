@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/ext-apps": "1.7.5"
+  }
+}
