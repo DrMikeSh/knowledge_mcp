@@ -1,5 +1,9 @@
 {
   "private": true,
+  "scripts": {
+    "test": "node --test tests/preflight/sqlite-fts5.test.mjs tests/preflight/mcp-negotiation.test.mjs",
+    "test:mcp": "node --test tests/preflight/mcp-negotiation.test.mjs"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
     "@modelcontextprotocol/ext-apps": "1.7.5"
