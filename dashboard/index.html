@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Factory activity</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, system-ui, sans-serif;
+      background: #11151a;
+      color: #edf1f5;
+      --muted: #aab6c4;
+      --border: #323d49;
+      --surface: #1a2028;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(68rem, 100% - 2rem); margin: 3rem auto; }
+    header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .75rem; margin-bottom: 1.5rem; }
+    h1 { margin: 0; font-size: clamp(1.9rem, 5vw, 2.75rem); letter-spacing: -.045em; }
+    h2 { margin: 0; font-size: 1.15rem; }
+    .connection { color: var(--muted); margin: 0; font-size: .875rem; }
+    .connection[data-state="live"] { color: #8ce6b2; }
+    .connection[data-state="error"] { color: #ffc787; }
+    .agents { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .agent { padding: 1.15rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); min-height: 10rem; }
+    .agent[data-state="Working"] { border-color: #528e70; }
+    .agent[data-state="Waiting for agent"] { border-color: #836f42; }
+    .agent-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; }
+    .status { border-radius: 1rem; padding: .25rem .55rem; color: var(--muted); background: #282f39; font-size: .875rem; }
+    .agent[data-state="Working"] .status { color: #a1edc0; background: #203b30; }
+    .agent[data-state="Waiting for agent"] .status { color: #f6d591; background: #3a3020; }
+    .tasks { list-style: none; margin: 1rem 0 0; padding: 0; }
+    .task + .task { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--border); }
+    .task p { margin: 0; line-height: 1.45; overflow-wrap: anywhere; }
+    .task .meta { margin-top: .3rem; color: var(--muted); font-size: .875rem; }
+    .usage { margin: .85rem 0 0; font-size: .875rem; }
+    .usage dt { color: var(--muted); }
+    .usage dd { margin: .25rem 0 .65rem; overflow-wrap: anywhere; }
+    .usage dd:last-child { margin-bottom: 0; }
+    .tool-list { display: flex; flex-wrap: wrap; gap: .35rem; }
+    .tool { background: #282f39; border-radius: .35rem; padding: .2rem .4rem; }
+    .hint { color: var(--muted); margin: 1rem 0 0; line-height: 1.5; }
+    @media (max-width: 46rem) {
+      main { margin-block: 1.75rem; }
+      .agents { grid-template-columns: 1fr; }
+      .agent { min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Factory activity</h1>
+      <p class="connection" id="connection">Connecting to OpenCode…</p>
+    </header>
+    <section class="agents" id="agents" aria-label="Factory agents">
+      <noscript>Enable JavaScript to see live agent activity.</noscript>
+    </section>
+    <p class="hint" id="hint" role="status">Waiting for the first update.</p>
+  </main>
+  <script>
+    const connection = document.getElementById('connection');
+    const agents = document.getElementById('agents');
+    const hint = document.getElementById('hint');
+    const activityUrl = new URL(window.location.href);
+    activityUrl.searchParams.set('activity', '1');
+    activityUrl.hash = '';
+    let lastAgents = '';
+    const number = new Intl.NumberFormat();
+
+    function element(tag, text, className) {
+      const node = document.createElement(tag);
+      node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function renderUsage(task) {
+      const usage = element('dl', '', 'usage');
+      const tokens = element('dd', task.tokens ? number.format(task.tokens.total) : 'Unavailable');
+      if (task.tokens) {
+        const { input, output, reasoning, cacheRead, cacheWrite } = task.tokens;
+        const breakdown = [[input, 'uncached in'], [output, 'out'], [reasoning, 'reasoning'],
+          [cacheRead, 'cache read'], [cacheWrite, 'cache written']];
+        const details = breakdown.filter(([value]) => value > 0)
+          .map(([value, label]) => `${number.format(value)} ${label}`);
+        if (details.length) tokens.append(element('p', details.join(' · '), 'meta'));
+      }
+      const tools = element('dd', task.tools ? 'None recorded' : 'Unavailable');
+      if (task.tools?.length) {
+        tools.textContent = '';
+        tools.className = 'tool-list';
+        for (const { name, calls } of task.tools) {
+          tools.append(element('span', `${name} ×${number.format(calls)}`, 'tool'));
+        }
+      }
+      usage.append(element('dt', 'Tokens used'), tokens, element('dt', 'Tool calls'), tools);
+      return usage;
+    }
+
+    function renderAgent(agent) {
+      const card = element('article', '', 'agent');
+      const tasks = agent.tasks;
+      const running = tasks.filter(task => task.status === 'Working').length;
+      const waiting = tasks.some(task => task.status === 'Waiting for agent');
+      const state = running ? 'Working' : waiting ? 'Waiting for agent' : 'Idle';
+      card.dataset.state = state;
+      const heading = element('div', '', 'agent-heading');
+      heading.append(element('h2', agent.name), element('span', state, 'status'));
+      card.append(heading);
+      const list = element('ul', '', 'tasks');
+      for (const task of tasks) {
+        const item = element('li', '', 'task');
+        item.append(element('p', task.title));
+        if (task.parent) item.append(element('p', task.parent, 'meta'));
+        const details = tasks.length > 1 || task.status === 'Last task' ? task.status : '';
+        const updated = task.updated ? new Date(task.updated).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+        if (details || updated) item.append(element('p', [details, updated].filter(Boolean).join(' · '), 'meta'));
+        item.append(renderUsage(task));
+        list.append(item);
+      }
+      if (tasks.length) card.append(list);
+      else card.append(element('p', 'No assigned task', 'hint'));
+      return card;
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch(activityUrl, { cache: 'no-store' });
+        const isJson = response.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await response.json().catch(() => null) : null;
+        if (!response.ok) {
+          throw new Error(data?.error || (response.status === 403
+            ? 'Activity access was blocked. Open the local URL printed by the dashboard server.'
+            : `Dashboard activity request failed (HTTP ${response.status}).`));
+        }
+        if (!Array.isArray(data?.agents)) {
+          throw new Error('The activity response was invalid. Open the local URL printed by the dashboard server.');
+        }
+        const next = JSON.stringify(data.agents);
+        if (next !== lastAgents) {
+          agents.replaceChildren(...data.agents.map(renderAgent));
+          lastAgents = next;
+        }
+        connection.dataset.state = 'live';
+        connection.textContent = `Live · ${new Date(data.checkedAt).toLocaleTimeString()}`;
+        const anyActive = data.agents.some(agent => agent.tasks.some(task => task.status !== 'Last task'));
+        const message = anyActive ? '' : 'No active factory tasks. Start a /factory run in OpenCode to see it here.';
+        if (hint.textContent !== message) hint.textContent = message;
+      } catch (error) {
+        connection.dataset.state = 'error';
+        connection.textContent = lastAgents ? 'Disconnected · showing last update' : 'Disconnected';
+        const message = error.message || 'Could not reach the local dashboard.';
+        if (hint.textContent !== message) hint.textContent = message;
+      } finally {
+        setTimeout(refresh, 2000);
+      }
+    }
+
+    refresh();
+  </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+#!/bin/bash
+set -euo pipefail
+
+project=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+workdir=$(pwd -P)
+case "$workdir" in
+  "$project"|"$project/"*) ;;
+  *) printf '%s\n' 'Factory shell requires a working directory inside the project.' >&2; exit 126 ;;
+esac
+
+if [[ ! -x /usr/bin/bwrap || ! -x /usr/bin/python3 ]]; then
+  printf '%s\n' 'Factory shell requires Bubblewrap and Python 3.' >&2
+  exit 126
+fi
+
+# A hard link could make an in-project write visible through an outside path.
+if ! linked=$(/usr/bin/find "$project" -xdev -type f -links +1 -print -quit) || [[ -n $linked ]]; then
+  printf '%s\n' 'Factory shell requires a checkout without hard-linked files.' >&2
+  exit 126
+fi
+
+exec 3< <(/usr/bin/python3 "$project/.opencode/factory-shell-filter.py")
+factory_branch='factory/[a-z0-9]+(-[a-z0-9]+)*'
+new_branch="^git switch -c ($factory_branch)$"
+branch_push="^git push origin (HEAD):refs/heads/($factory_branch)$"
+main_push='^git push origin ([0-9a-f]{40}|[0-9a-f]{64}):refs/heads/(main)$'
+command=${2-}
+sandbox=(
+  --unshare-all --unshare-user --disable-userns --die-with-parent --new-session
+  --seccomp 3
+  --ro-bind / / --dev /dev --proc /proc --tmpfs /run --tmpfs /tmp
+  --bind "$project" "$project" --chdir "$workdir"
+  --unsetenv BASH_ENV --unsetenv ENV --setenv TMPDIR /tmp
+  --unsetenv XDG_RUNTIME_DIR --setenv GIT_OPTIONAL_LOCKS 0
+  --setenv npm_config_logs_max 0
+)
+
+for path in .opencode opencode.json opencode.jsonc AGENTS.md; do
+  if [[ -e "$project/$path" ]]; then
+    sandbox+=(--ro-bind "$project/$path" "$project/$path")
+  fi
+done
+
+if [[ $# == 2 && $1 == -c && $command =~ $new_branch ]]; then
+  exec /usr/bin/bwrap "${sandbox[@]}" -- /usr/bin/git switch -c "${BASH_REMATCH[1]}"
+fi
+
+if [[ $# == 2 && $1 == -c && ( $command =~ $branch_push || $command =~ $main_push ) ]]; then
+  source_ref=${BASH_REMATCH[1]}
+  destination=${BASH_REMATCH[2]}
+  branch=$(/usr/bin/git -C "$project" branch --show-current)
+  if ! [[ $branch =~ ^$factory_branch$ && ( $destination == main || $destination == "$branch" ) ]]; then
+    printf '%s\n' 'Push from a factory branch to its matching remote branch or to approved main.' >&2
+    exit 126
+  fi
+  if [[ $destination == main && $source_ref != "$(/usr/bin/git -C "$project" rev-parse HEAD)" ]]; then
+    printf '%s\n' 'The main push must name the current factory commit.' >&2
+    exit 126
+  fi
+
+  # Only OpenCode's explicit push commands receive network access.
+  exec /usr/bin/bwrap "${sandbox[@]}" --share-net --setenv GIT_TERMINAL_PROMPT 0 -- /usr/bin/git \
+    -c core.hooksPath=/dev/null -c remote.origin.mirror=false \
+    push --no-follow-tags -- origin "$source_ref:refs/heads/$destination"
+fi
+
+if [[ $command == 'git switch'* || $command == 'git push'* ]]; then
+  printf '%s\n' 'Use an explicit factory branch creation or a permitted push destination.' >&2
+  exit 126
+fi
+
+if [[ $# == 2 && $1 == -c && ( $command == 'git add -- '* || $command == 'git commit -m '* ) ]]; then
+  branch=$(/usr/bin/git -C "$project" branch --show-current)
+  if ! [[ $branch =~ ^$factory_branch$ ]]; then
+    printf '%s\n' 'Stage and commit factory work on a factory branch.' >&2
+    exit 126
+  fi
+elif [[ -e "$project/.git" ]]; then
+  # Ordinary commands, including project tests, cannot change Git metadata.
+  sandbox+=(--ro-bind "$project/.git" "$project/.git")
+fi
+
+exec /usr/bin/bwrap "${sandbox[@]}" -- /bin/bash --noprofile --norc "$@"
