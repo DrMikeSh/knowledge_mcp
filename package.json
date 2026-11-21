@@ -7,6 +7,7 @@
   "scripts": {
     "test": "node --test tests/preflight/sqlite-fts5.test.mjs tests/preflight/mcp-negotiation.test.mjs tests/preflight/mcp-tool-discovery.test.mjs tests/preflight/mcp-read-call.test.mjs tests/preflight/mcp-resource-read.test.mjs",
     "test:mcp": "node --test tests/preflight/mcp-negotiation.test.mjs tests/preflight/mcp-tool-discovery.test.mjs tests/preflight/mcp-read-call.test.mjs tests/preflight/mcp-resource-read.test.mjs",
+    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
