@@ -16,5 +16,6 @@
 - [Offline preflight follow-up](offline-preflight-follow-up.md) — Earlier cache evidence, one T1.4 acceptance case, and provisioning gates.
 - [B7.1 SQLite FTS5 smoke test](sqlite-fts5-smoke.md) — Verified in-memory Node SQLite check; migrations remain untested.
 - [Offline npm dependency checkpoint](offline-npm-install.md) — Reviewed manifest and lockfile, clean offline install, and confirmed installed pins.
+- [MCP protocol baseline](protocol-baseline.md) — Verified in-memory core negotiation and the installed SDK and Apps pins.
 
-Docker build and MCP harness readiness are not yet verified. ChatGPT and Claude remain **EXTERNAL VERIFICATION PENDING**.
+The full MCP harness, Apps behavior, and Docker build are not yet verified. ChatGPT and Claude remain **EXTERNAL VERIFICATION PENDING**.
